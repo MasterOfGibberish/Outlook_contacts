@@ -1,12 +1,65 @@
-import win32com.client
-import pandas as pd
-import os
 import sys
+import os
+import subprocess
 import traceback
-import pythoncom
-import logging
 import tempfile
 from datetime import datetime
+
+# Function to check and install required packages
+def ensure_packages():
+    required_packages = ["pywin32", "pandas", "openpyxl", "tkinter"]
+    missing_packages = []
+    
+    # First try importing each package to see if it's already installed
+    for package in required_packages:
+        try:
+            if package == "pywin32":
+                __import__("win32com")
+            elif package == "tkinter":
+                __import__("tkinter")
+            else:
+                __import__(package)
+        except ImportError:
+            missing_packages.append(package)
+    
+    # If missing packages, install them
+    if missing_packages:
+        print(f"Installing missing packages: {', '.join(missing_packages)}")
+        try:
+            subprocess.check_call([sys.executable, "-m", "pip", "install"] + missing_packages)
+            print("Packages installed successfully!")
+            
+            # A special fix for pywin32 post-install
+            if "pywin32" in missing_packages:
+                try:
+                    # Find pywin32_postinstall.py
+                    site_packages = subprocess.check_output([sys.executable, "-c", 
+                                 "import site; print(site.getsitepackages()[0])"]).decode().strip()
+                    postinstall_script = os.path.join(site_packages, "pywin32_system32", "pywin32_postinstall.py")
+                    
+                    if os.path.exists(postinstall_script):
+                        print("Running pywin32 post-install script...")
+                        subprocess.check_call([sys.executable, postinstall_script, "-install"])
+                except Exception as e:
+                    print(f"Warning: Could not run pywin32 post-install: {e}")
+            
+            # Restart the script to use newly installed packages
+            print("Restarting application with installed packages...")
+            os.execv(sys.executable, [sys.executable] + sys.argv)
+        except Exception as e:
+            print(f"Error installing packages: {e}")
+            print("Please run: pip install pywin32 pandas openpyxl")
+            input("Press Enter to exit...")
+            sys.exit(1)
+
+# Make sure required packages are installed first
+ensure_packages()
+
+# Now import the packages
+import win32com.client
+import pandas as pd
+import pythoncom
+import logging
 import tkinter as tk
 from tkinter import messagebox
 
@@ -261,4 +314,12 @@ if __name__ == "__main__":
     except Exception as e:
         logging.error(f"Unhandled exception: {e}")
         logging.error(traceback.format_exc())
-        messagebox.showerror("Error", f"An unexpected error occurred: {str(e)}")
+        
+        # If we get here before tkinter is initialized, we need a basic error message
+        try:
+            messagebox.showerror("Error", f"An unexpected error occurred: {str(e)}")
+        except:
+            print(f"\nERROR: {str(e)}")
+            print("Please make sure all required packages are installed:")
+            print("pip install pywin32 pandas openpyxl")
+            input("\nPress Enter to exit...")

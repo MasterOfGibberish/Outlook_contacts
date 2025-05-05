@@ -1,6 +1,63 @@
+import sys
+import os
+import subprocess
+import traceback
+import tempfile
+from datetime import datetime
+
+# Function to check and install required packages
+def ensure_packages():
+    required_packages = ["pywin32", "pandas", "openpyxl", "tkinter"]
+    missing_packages = []
+    
+    # First try importing each package to see if it's already installed
+    for package in required_packages:
+        try:
+            if package == "pywin32":
+                __import__("win32com")
+            elif package == "tkinter":
+                __import__("tkinter")
+            else:
+                __import__(package)
+        except ImportError:
+            missing_packages.append(package)
+    
+    # If missing packages, install them
+    if missing_packages:
+        print(f"Installing missing packages: {', '.join(missing_packages)}")
+        try:
+            subprocess.check_call([sys.executable, "-m", "pip", "install"] + missing_packages)
+            print("Packages installed successfully!")
+            
+            # A special fix for pywin32 post-install
+            if "pywin32" in missing_packages:
+                try:
+                    # Find pywin32_postinstall.py
+                    site_packages = subprocess.check_output([sys.executable, "-c", 
+                                 "import site; print(site.getsitepackages()[0])"]).decode().strip()
+                    postinstall_script = os.path.join(site_packages, "pywin32_system32", "pywin32_postinstall.py")
+                    
+                    if os.path.exists(postinstall_script):
+                        print("Running pywin32 post-install script...")
+                        subprocess.check_call([sys.executable, postinstall_script, "-install"])
+                except Exception as e:
+                    print(f"Warning: Could not run pywin32 post-install: {e}")
+            
+            # Restart the script to use newly installed packages
+            print("Restarting application with installed packages...")
+            os.execv(sys.executable, [sys.executable] + sys.argv)
+        except Exception as e:
+            print(f"Error installing packages: {e}")
+            print("Please run manually: pip install pywin32 pandas openpyxl")
+            input("Press Enter to exit...")
+            sys.exit(1)
+
+# Make sure required packages are installed first
+ensure_packages()
+
+# Now import the packages
 import win32com.client
 import pandas as pd
-import os
 import tkinter as tk
 from tkinter import messagebox, ttk
 import re
@@ -86,14 +143,36 @@ def extract_contacts_thread(progress_window, progress_var, status_var):
             return role
         
         # Get all the folders to scan - expand to more folders to find all contacts
-        folders_to_scan = {
-            "Sent Items": namespace.GetDefaultFolder(5),        # 5 = olFolderSentMail
-            "Inbox": namespace.GetDefaultFolder(6),             # 6 = olFolderInbox
-            "Deleted Items": namespace.GetDefaultFolder(3),     # 3 = olFolderDeletedItems
-            "Drafts": namespace.GetDefaultFolder(16),           # 16 = olFolderDrafts
-            "Outbox": namespace.GetDefaultFolder(4),            # 4 = olFolderOutbox
-            "Junk Email": namespace.GetDefaultFolder(23)        # 23 = olFolderJunk
-        }
+        folders_to_scan = {}
+        try:
+            folders_to_scan["Sent Items"] = namespace.GetDefaultFolder(5)  # 5 = olFolderSentMail
+        except:
+            pass
+            
+        try:
+            folders_to_scan["Inbox"] = namespace.GetDefaultFolder(6)  # 6 = olFolderInbox
+        except:
+            pass
+            
+        try:
+            folders_to_scan["Deleted Items"] = namespace.GetDefaultFolder(3)  # 3 = olFolderDeletedItems
+        except:
+            pass
+            
+        try:
+            folders_to_scan["Drafts"] = namespace.GetDefaultFolder(16)  # 16 = olFolderDrafts
+        except:
+            pass
+            
+        try:
+            folders_to_scan["Outbox"] = namespace.GetDefaultFolder(4)  # 4 = olFolderOutbox
+        except:
+            pass
+            
+        try:
+            folders_to_scan["Junk Email"] = namespace.GetDefaultFolder(23)  # 23 = olFolderJunk
+        except:
+            pass
         
         # Try to access Archive folder if it exists
         try:
@@ -455,8 +534,16 @@ def extract_contacts_thread(progress_window, progress_var, status_var):
         
         # Save to Excel
         desktop_path = os.path.join(os.path.expanduser("~"), "Desktop")
-        file_path = os.path.join(desktop_path, "outlook_contacts.xlsx")
-        result_df.to_excel(file_path, index=False)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        file_path = os.path.join(desktop_path, f"outlook_contacts_{timestamp}.xlsx")
+        
+        try:
+            result_df.to_excel(file_path, index=False)
+        except Exception as excel_error:
+            # Try saving to temp directory if desktop fails
+            temp_dir = tempfile.gettempdir()
+            file_path = os.path.join(temp_dir, f"outlook_contacts_{timestamp}.xlsx")
+            result_df.to_excel(file_path, index=False)
         
         # Final update
         progress_var.set(100)
@@ -529,6 +616,13 @@ def create_gui():
     root.geometry("450x250")
     root.resizable(False, False)
     
+    # Center the window
+    screen_width = root.winfo_screenwidth()
+    screen_height = root.winfo_screenheight()
+    x = (screen_width - 450) // 2
+    y = (screen_height - 250) // 2
+    root.geometry(f"450x250+{x}+{y}")
+    
     # Add some padding
     frame = tk.Frame(root, padx=20, pady=20)
     frame.pack(fill=tk.BOTH, expand=True)
@@ -554,7 +648,23 @@ def create_gui():
     status = tk.Label(frame, text="Will collect ALL contacts from your Outlook", font=("Arial", 8), fg="gray")
     status.pack(pady=(15, 0))
     
+    # Add version
+    version = tk.Label(frame, text="v1.1.0", font=("Arial", 8), fg="gray")
+    version.pack(pady=(5, 0))
+    
     root.mainloop()
 
 if __name__ == "__main__":
-    create_gui() 
+    try:
+        # Make sure required packages are installed
+        ensure_packages()
+        create_gui()
+    except Exception as e:
+        # If we get here before tkinter is initialized, we need a basic error message
+        try:
+            messagebox.showerror("Error", f"An unexpected error occurred: {str(e)}")
+        except:
+            print(f"\nERROR: {str(e)}")
+            print("Please make sure all required packages are installed:")
+            print("pip install pywin32 pandas openpyxl")
+            input("\nPress Enter to exit...") 
