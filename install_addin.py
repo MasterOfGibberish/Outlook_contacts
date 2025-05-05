@@ -81,8 +81,9 @@ def create_startup_shortcut():
     try:
         print("Creating startup shortcut for auto-loading...")
         startup_folder = os.path.join(os.environ["APPDATA"], "Microsoft", "Windows", "Start Menu", "Programs", "Startup")
-        addin_path = os.path.abspath("addin.py")
-        vbs_path = os.path.join(os.path.dirname(addin_path), "start_addin.vbs")
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        addin_path = os.path.join(script_dir, "addin.py")
+        vbs_path = os.path.join(script_dir, "start_addin.vbs")
         
         # Create a VBS script to run the Python script hidden
         with open(vbs_path, "w") as f:
@@ -93,7 +94,7 @@ def create_startup_shortcut():
         shell = win32com.client.Dispatch("WScript.Shell")
         shortcut = shell.CreateShortCut(os.path.join(startup_folder, "OutlookContactExporter.lnk"))
         shortcut.Targetpath = vbs_path
-        shortcut.WorkingDirectory = os.path.dirname(addin_path)
+        shortcut.WorkingDirectory = script_dir
         shortcut.Description = "Outlook Contact Exporter"
         shortcut.save()
         
@@ -112,8 +113,16 @@ def install_addin():
     if not ensure_dependencies():
         return False
     
+    # Get the script directory (where this installer is located)
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    
     # Get the full path of the add-in script
-    addin_path = os.path.abspath("addin.py")
+    addin_path = os.path.join(script_dir, "addin.py")
+    
+    if not os.path.exists(addin_path):
+        print(f"ERROR: Could not find addin.py in {script_dir}")
+        print("Make sure addin.py is in the same directory as this installer.")
+        return False
     
     # Register the add-in as a COM server
     print("Registering COM server...")
@@ -123,13 +132,31 @@ def install_addin():
         print(f"Error registering COM server: {e}")
         print("Trying alternative registration method...")
         try:
-            from win32com.client import makepy
-            import win32com.server.register
-            win32com.server.register.UseCommandLine(None)
-            # Try to register more directly
-            from addin import OutlookAddin
-            win32com.server.register.RegisterClasses(OutlookAddin)
-            print("Alternative registration successful!")
+            # Change to the script directory before importing
+            original_dir = os.getcwd()
+            os.chdir(script_dir)
+            
+            # Add the script directory to sys.path if not already there
+            if script_dir not in sys.path:
+                sys.path.insert(0, script_dir)
+                
+            # Try to import the addin module directly
+            try:
+                from addin import OutlookAddin
+                import win32com.server.register
+                win32com.server.register.RegisterClasses(OutlookAddin)
+                print("Alternative registration successful!")
+            except ImportError:
+                print("Could not import the OutlookAddin class")
+                print(f"Current directory: {os.getcwd()}")
+                print(f"sys.path: {sys.path}")
+                print(f"Files in directory: {os.listdir(script_dir)}")
+                with open(addin_path, 'r') as f:
+                    print(f"First 10 lines of addin.py: {f.readlines()[:10]}")
+                return False
+            finally:
+                # Return to the original directory
+                os.chdir(original_dir)
         except Exception as e2:
             print(f"Alternative registration also failed: {e2}")
             return False
@@ -166,9 +193,13 @@ def install_addin():
     return True
 
 def uninstall_addin():
-    # Unregister the COM server
-    addin_path = os.path.abspath("addin.py")
+    # Get the script directory (where this installer is located)
+    script_dir = os.path.dirname(os.path.abspath(__file__))
     
+    # Get the full path of the add-in script
+    addin_path = os.path.join(script_dir, "addin.py")
+    
+    # Unregister the COM server
     try:
         print("Unregistering COM server...")
         subprocess.check_call([sys.executable, addin_path, "--unregister"])
@@ -176,11 +207,22 @@ def uninstall_addin():
         print(f"Error unregistering COM server: {e}")
         print("Trying alternative unregistration method...")
         try:
+            # Change to the script directory before importing
+            original_dir = os.getcwd()
+            os.chdir(script_dir)
+            
+            # Add the script directory to sys.path if not already there
+            if script_dir not in sys.path:
+                sys.path.insert(0, script_dir)
+            
             # Try to unregister more directly
             from addin import OutlookAddin
             import win32com.server.register
             win32com.server.register.UnregisterClasses(OutlookAddin)
             print("Alternative unregistration successful!")
+            
+            # Return to the original directory
+            os.chdir(original_dir)
         except Exception as e2:
             print(f"Alternative unregistration also failed: {e2}")
     
@@ -213,7 +255,7 @@ def uninstall_addin():
         if os.path.exists(shortcut_path):
             os.remove(shortcut_path)
         
-        vbs_path = os.path.join(os.path.dirname(addin_path), "start_addin.vbs")
+        vbs_path = os.path.join(script_dir, "start_addin.vbs")
         if os.path.exists(vbs_path):
             os.remove(vbs_path)
     except Exception as e:

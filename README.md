@@ -12,9 +12,9 @@ This add-in adds a "Save Contacts" button to Microsoft Outlook that lets you ext
 ✅ Removes duplicate entries
 ✅ Works with multiple Outlook versions (2013, 2016, 2019, 365)
 
-## Screenshots
+## Screenshot
 
-![Outlook Tab](https://github.com/YourUsername/outlook-contact-exporter/raw/main/screenshots/outlook_tab.png)
+![Outlook Tab](https://raw.githubusercontent.com/MasterOfGibberish/Outlook_contacts/main/screenshots/outlook_tab.png)
 *Contact Tools tab in Outlook*
 
 ## Requirements
@@ -27,7 +27,7 @@ This add-in adds a "Save Contacts" button to Microsoft Outlook that lets you ext
 
 ### Quick Install (Recommended)
 
-1. [Download the latest release ZIP](https://github.com/YourUsername/outlook-contact-exporter/releases/latest)
+1. [Download this repository as ZIP](https://github.com/MasterOfGibberish/Outlook_contacts/archive/refs/heads/main.zip)
 2. Extract the ZIP file to a folder on your computer
 3. Right-click on `install_addin.py` and select **"Run as administrator"**
 4. Choose option 1 (Install Add-in)
@@ -63,6 +63,7 @@ If the quick install doesn't work:
 - **Installation fails:** Try the manual installation method above.
 - **Excel file not created:** Check your Desktop for "contact_export_result.txt" or look in %TEMP% folder.
 - **Add-in crashes:** Look for "outlook_contact_exporter_error.txt" on your Desktop.
+- **"No such file or directory" error:** Make sure you're running the installer from the folder where it's located, not copying it elsewhere.
 
 ### Logs
 
@@ -90,7 +91,7 @@ This will open a GUI that performs the same extraction without needing the add-i
 
 If you encounter any issues:
 
-1. Check the [GitHub Issues](https://github.com/YourUsername/outlook-contact-exporter/issues) for known problems
+1. Check the [GitHub Issues](https://github.com/MasterOfGibberish/Outlook_contacts/issues) for known problems
 2. Submit a new issue with:
    - Your Windows version
    - Your Outlook version
